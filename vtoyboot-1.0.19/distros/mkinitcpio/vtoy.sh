@@ -17,52 +17,41 @@
 # 
 #************************************************************************************
 
-vtoy_clean_env() {
-    rm -f /sbin/vtoydump  /sbin/vtoypartx  /sbin/vtoytool  /sbin/vtoydmpatch  /sbin/vtoydrivers
-    rm -f /usr/share/initramfs-tools/hooks/vtoy-hook.sh  
-    rm -f /etc/initramfs-tools/scripts/local-top/vtoy-local-top.sh
-}
-
-vtoy_efi_fixup() {
-    if [ -d /boot/efi/EFI ]; then
-        for f in 'boot/bootx64.efi' 'boot/BOOTX64.efi' 'boot/BOOTX64.EFI' 'BOOT/bootx64.efi' 'BOOT/BOOTX64.efi' 'BOOT/BOOTX64.EFI'; do
-            if [ -f /boot/efi/EFI/$f ]; then
-                return
-            fi
-        done
-    fi
-
-    Dirs=$(ls /boot/efi/EFI)
-    
-    if ! [ -d /boot/efi/EFI/boot ]; then
-        mkdir -p /boot/efi/EFI/boot
-    fi
-    
-    for d in $Dirs; do
-        for e in 'grubx64.efi' 'GRUBX64.EFI' 'bootx64.efi' 'BOOTX64.EFI'; do
-            if [ -f "/boot/efi/EFI/$d/$e" ]; then
-                cp -a "/boot/efi/EFI/$d/$e" /boot/efi/EFI/boot/bootx64.efi
-                return
-            fi
-        done        
-    done
-}
-
 . ./tools/efi_legacy_grub.sh
+
+vtoy_clean_env() {
+    rm -f /sbin/vtoydump  /sbin/vtoypartx  /sbin/vtoydrivers
+    rm -f /usr/lib/initcpio/hooks/ventoy
+    rm -f /usr/lib/initcpio/install/ventoy
+}
 
 vtoy_clean_env
 
 cp -a $vtdumpcmd /sbin/vtoydump
 cp -a $partxcmd  /sbin/vtoypartx
-cp -a $vtoytool  /sbin/vtoytool
-cat /sbin/vtoydump $dmpatchko > /sbin/vtoydmpatch
 cp -a ./tools/vtoydrivers /sbin/vtoydrivers
-cp -a ./distros/$initrdtool/vtoy-hook.sh  /usr/share/initramfs-tools/hooks/
-cp -a ./distros/$initrdtool/vtoy-local-top.sh  /etc/initramfs-tools/scripts/local-top/
+cp -a ./distros/$initrdtool/ventoy-install.sh  /usr/lib/initcpio/install/ventoy
+cp -a ./distros/$initrdtool/ventoy-hook.sh  /usr/lib/initcpio/hooks/ventoy
 
 echo "updating the initramfs, please wait ..."
-update-initramfs -u
 
+if ! grep -q '^HOOKS=.*ventoy' /etc/mkinitcpio.conf; then
+    if grep -q '^HOOKS=.*lvm' /etc/mkinitcpio.conf; then
+        exthook='ventoy'
+    else
+        exthook='lvm2 ventoy'
+    fi
+
+    if grep -q '^HOOKS=.*encrypt' /etc/mkinitcpio.conf; then
+        sed "s/\(^HOOKS=.*\)encrypt/\1 $exthook encrypt/" -i /etc/mkinitcpio.conf
+    elif grep -q "^HOOKS=\"" /etc/mkinitcpio.conf; then    
+        sed "s/^HOOKS=\"\(.*\)\"/HOOKS=\"\1 $exthook\"/" -i /etc/mkinitcpio.conf
+    elif grep -q "^HOOKS=(" /etc/mkinitcpio.conf; then    
+        sed "s/^HOOKS=(\(.*\))/HOOKS=(\1 $exthook)/" -i /etc/mkinitcpio.conf
+    fi
+fi
+
+mkinitcpio -P
 
 disable_grub_os_probe
 
@@ -85,7 +74,7 @@ if [ -e "$PROBE_PATH" -a -e "$MKCONFIG_PATH" ]; then
     fi
 fi
 
-#efi fixup 
+
 if [ -e /sys/firmware/efi ]; then
     if [ -e /dev/mapper/ventoy ]; then
         echo "This is ventoy enviroment"
@@ -93,13 +82,4 @@ if [ -e /sys/firmware/efi ]; then
         update_grub_config
         install_legacy_bios_grub
     fi
-    
-    if [ "$1" = "-s" ]; then
-        recover_shim_efi
-    else
-        replace_shim_efi
-    fi
-    
-    vtoy_efi_fixup
 fi
-

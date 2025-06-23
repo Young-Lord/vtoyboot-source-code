@@ -32,15 +32,13 @@ else
 fi
 
 
-rm -f /bin/vtoydump /bin/vtoypartx /bin/vtoytool /bin/vtoydmpatch
+rm -f /bin/vtoydump /bin/vtoypartx
 rm -f $dracutConfPath/ventoy.conf
 rm -rf $vtmodpath
 mkdir -p $vtmodpath
 
 cp -a $vtdumpcmd /bin/vtoydump
 cp -a $partxcmd /bin/vtoypartx
-cp -a $vtoytool /bin/vtoytool
-cat /bin/vtoydump $dmpatchko > /bin/vtoydmpatch
 cp -a ./distros/$initrdtool/module-setup.sh $vtmodpath/
 cp -a ./distros/$initrdtool/ventoy-settled.sh $vtmodpath/
 
@@ -110,12 +108,6 @@ if [ -e /sys/firmware/efi ]; then
     else
         update_grub_config
         install_legacy_bios_grub
-    fi
-    
-    if [ "$1" = "-s" ]; then
-        recover_shim_efi
-    else
-        replace_shim_efi
     fi
     
     if [ -d /boot/EFI/EFI/mageia ]; then
