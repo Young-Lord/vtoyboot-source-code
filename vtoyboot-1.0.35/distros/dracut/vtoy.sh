@@ -32,7 +32,7 @@ else
 fi
 
 
-rm -f /bin/vtoydump /bin/vtoypartx /bin/vtoytool
+rm -f /bin/vtoydump /bin/vtoypartx /bin/vtoytool /bin/vtoydmpatch
 rm -f $dracutConfPath/ventoy.conf
 rm -rf $vtmodpath
 mkdir -p $vtmodpath
@@ -40,6 +40,7 @@ mkdir -p $vtmodpath
 cp -a $vtdumpcmd /bin/vtoydump
 cp -a $partxcmd /bin/vtoypartx
 cp -a $vtoytool /bin/vtoytool
+cat /bin/vtoydump $dmpatchko > /bin/vtoydmpatch
 cp -a ./distros/$initrdtool/module-setup.sh $vtmodpath/
 cp -a ./distros/$initrdtool/ventoy-settled.sh $vtmodpath/
 

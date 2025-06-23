@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #************************************************************************************
 # Copyright (c) 2020, longpanda <admin@ventoy.net>
 # 
@@ -17,31 +17,40 @@
 # 
 #************************************************************************************
 
-build() {
-    add_binary "dd"
-    add_binary "sort"
-    add_binary "head"
-    add_binary "find"
-    add_binary "xzcat"
-    add_binary "zcat"
-    add_binary "basename"
-    add_binary "vtoydump"
-    add_binary "vtoypartx"
-    add_binary "vtoytool"
+PREREQ="dmsetup"
+prereqs() {
+    echo "$PREREQ"
+}
 
-    for md in $(cat /sbin/vtoydrivers); do
-        if [ -n "$md" ]; then
-            if modinfo -n $md 2>/dev/null | grep -q '\.ko'; then
-                add_module $md
-            fi
+case $1 in
+    prereqs)
+       prereqs
+       exit 0
+       ;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+# Begin real processing below this line
+
+for md in $(cat /sbin/vtoydrivers); do
+    if [ -n "$md" ]; then
+        if modinfo -n $md 2>/dev/null | grep -q '\.ko'; then
+            force_load $md
+        fi
+    fi
+done
+
+for ef in dd sort head find basename xzcat zcat; do
+    for vp in /bin /sbin /usr/bin /usr/sbin; do
+        if [ -f $vp/$ef ]; then
+            copy_exec $vp/$ef /sbin
+            break
         fi
     done
+done
 
-    add_runscript
-}
-
-help() {
-  cat <<HELPEOF
-This hook enables ventoy in initramfs.
-HELPEOF
-}
+copy_exec /sbin/vtoytool    /sbin
+copy_exec /sbin/vtoydmpatch /sbin
+copy_exec /sbin/vtoypartx   /sbin
+copy_exec /sbin/vtoydump    /sbin

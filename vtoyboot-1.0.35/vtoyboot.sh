@@ -17,7 +17,7 @@
 # 
 #************************************************************************************
 
-vtoy_version=1.0.36
+vtoy_version=1.0.35
 
 if echo "$*" | grep -q __vtoyloop__; then
     :
@@ -123,16 +123,23 @@ if uname -a | grep -Eq "x86_64|amd64"; then
     partxcmd=./tools/vtoypartx64
     vtcheckcmd=./tools/vtoycheck64
     vtoytool=./tools/vtoytool_64
+    dmpatchko=./tools/dm_patch_64.ko
+    
+    if vtoyboot_need_proc_ibt $vtoytool; then
+        dmpatchko=./tools/dm_patch_ibt_64.ko
+    fi    
 elif uname -a | grep -Eq "aarch64|arm64"; then
     vtdumpcmd=./tools/vtoydumpaa64
     partxcmd=./tools/vtoypartxaa64
     vtcheckcmd=./tools/vtoycheckaa64
     vtoytool=./tools/vtoytool_aa64
+    dmpatchko=./tools/dm_patch_64.ko
 else
     vtdumpcmd=./tools/vtoydump32
     partxcmd=./tools/vtoypartx32
     vtcheckcmd=./tools/vtoycheck32
     vtoytool=./tools/vtoytool_32
+    dmpatchko=./tools/dm_patch_32.ko
 fi
 
 chmod +x $vtdumpcmd $partxcmd $vtcheckcmd
