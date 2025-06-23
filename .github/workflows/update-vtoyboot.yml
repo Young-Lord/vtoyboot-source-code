@@ -32,12 +32,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Prepend vtoyboot link to README.md
-          echo -e "Unpacked files of [vtoyboot](https://github.com/ventoy/vtoyboot).\n\n$(cat README.md 2>/dev/null)" > README.md
-          git add README.md
-
           # Process each release from JSON
-          while read release; do
+          tac ../releases.json | while read release; do
             find . -maxdepth 1 ! -name '.git' ! -name '.github' ! -name '.' -exec rm -rf {} +
             tag_name=$(jq -r '.tag_name' <<< "$release")
             iso_url=$(jq -r '.assets | select(contains("vtoyboot-") and (endswith(".iso") or endswith(".tar.gz")))' <<< "$release")
@@ -47,10 +43,10 @@ jobs:
               continue
             fi
 
-            #if git rev-parse "refs/tags/$tag_name" &>/dev/null; then
-            #  echo "✅ $tag_name already processed"
-            #  continue
-            #fi
+            # if git rev-parse "refs/tags/$tag_name" &>/dev/null; then
+            #   echo "✅ $tag_name already processed"
+            #   continue
+            # fi
 
             echo "🚀 Processing $tag_name: $iso_url"
 
@@ -63,8 +59,14 @@ jobs:
             else
               wget -q "$iso_url" -O vtoyboot.tar.gz
             fi
+            
             tar xvf vtoyboot*.tar.gz
             rm -f vtoyboot.iso vtoyboot*.tar.gz
+            mv vtoyboot-*/* .
+            rmdir vtoyboot-*
+            
+            # Prepend vtoyboot link to README.md
+            echo -e "Unpacked files of [vtoyboot](https://github.com/ventoy/vtoyboot).\n\n$(cat README.md 2>/dev/null)" > README.md
 
             # Commit changes
             git config user.name "github-actions[bot]"
@@ -74,7 +76,7 @@ jobs:
 
             # Tag release
             git tag -f -a "$tag_name" -m "vtoyboot $tag_name"
-          done < ../releases.json
+          done
 
       - name: Force push updates and tags
         run: |
