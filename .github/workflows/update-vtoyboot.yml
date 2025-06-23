@@ -60,7 +60,7 @@ jobs:
               wget -q "$iso_url" -O vtoyboot.tar.gz
             fi
             
-            tar xvf vtoyboot*.tar.gz
+            tar xf vtoyboot*.tar.gz
             rm -f vtoyboot.iso vtoyboot*.tar.gz
             mv vtoyboot-*/* .
             rmdir vtoyboot-*
@@ -79,7 +79,7 @@ jobs:
 
             # Release
             wget -q "$iso_url"
-            gh release create "$tag_name" -t "$tag_name" vtoyboot*.*
+            gh release create "$tag_name" -t "$tag_name" vtoyboot*.{iso,tar.gz}
           done
 
       - name: Force push updates and tags
