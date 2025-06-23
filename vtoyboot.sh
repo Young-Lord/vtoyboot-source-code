@@ -17,7 +17,7 @@
 # 
 #************************************************************************************
 
-vtoy_version=1.0.28
+vtoy_version=1.0.29
 
 if echo "$*" | grep -q __vtoyloop__; then
     :
@@ -81,6 +81,41 @@ if ! [ -f ./distros/$initrdtool/vtoy.sh ]; then
     exit 1
 fi
 
+vtoyboot_need_proc_ibt() {
+    vtTool=$1
+    vtKv=$(uname -r)
+    vtMajor=$(echo $vtKv | awk -F. '{print $1}')
+    vtMinor=$(echo $vtKv | awk -F. '{print $2}')
+    
+    #ibt was supported since linux kernel 5.18
+    if [ $vtMajor -lt 5 ]; then
+        false; return
+    elif [ $vtMajor -eq 5 ]; then
+        if [ $vtMajor -lt 18 ]; then
+            false; return
+        fi
+    fi
+    
+    if grep -q ' ibt=off' /proc/cmdline; then
+        false; return
+    fi
+
+    #hardware CPU doesn't support IBT
+    if $vtTool vtoykmod -I; then
+        :
+    else
+        false; return
+    fi
+    
+    #dot.CONFIG not enabled
+    if grep -q ' ibt_restore$' /proc/kallsyms; then
+        :
+    else
+        false; return
+    fi
+    
+    true
+}
 
 #prepare vtoydump
 if uname -a | grep -Eq "x86_64|amd64"; then
@@ -89,6 +124,10 @@ if uname -a | grep -Eq "x86_64|amd64"; then
     vtcheckcmd=./tools/vtoycheck64
     vtoytool=./tools/vtoytool_64
     dmpatchko=./tools/dm_patch_64.ko
+    
+    if vtoyboot_need_proc_ibt $vtoytool; then
+        dmpatchko=./tools/dm_patch_ibt_64.ko
+    fi    
 elif uname -a | grep -Eq "aarch64|arm64"; then
     vtdumpcmd=./tools/vtoydumpaa64
     partxcmd=./tools/vtoypartxaa64

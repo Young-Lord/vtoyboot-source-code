@@ -56,6 +56,42 @@ ventoy_check_insmod() {
     fi
 }
 
+ventoy_need_proc_ibt() {
+    vtKv=$(uname -r)
+    vtMajor=$(echo $vtKv | awk -F. '{print $1}')
+    vtMinor=$(echo $vtKv | awk -F. '{print $2}')
+    
+    #ibt was supported since linux kernel 5.18
+    if [ $vtMajor -lt 5 ]; then
+        false; return
+    elif [ $vtMajor -eq 5 ]; then
+        if [ $vtMajor -lt 18 ]; then
+            false; return
+        fi
+    fi
+    
+    if grep -q ' ibt=off' /proc/cmdline; then
+        false; return
+    fi
+
+    #hardware CPU doesn't support IBT
+    if vtoytool vtoykmod -I; then
+        :
+    else
+        false; return
+    fi
+    
+    #dot.CONFIG not enabled
+    if grep -q ' ibt_restore$' /proc/kallsyms; then
+        :
+    else
+        false; return
+    fi
+    
+    true
+}
+
+
 ventoy_do_dm_patch() {
     ventoy_log 'ventoy_do_dm_patch'
     if [ -f /tmp/dm_patch.ko ]; then
@@ -126,6 +162,14 @@ ventoy_do_dm_patch() {
         printk_addr=$($GREP ' _printk$' /proc/kallsyms | awk '{print $1}')
     fi
     
+    if ventoy_need_proc_ibt; then
+        ventoy_log "need to proc IBT"
+        vtIBT='0x8888'
+    else
+        ventoy_log "NO need to proc IBT"
+        vtIBT='0'
+    fi 
+    
     #printk_addr=$(grep ' printk$' /proc/kallsyms | awk '{print $1}')
     #vtDebug="-v"
 
@@ -182,7 +226,7 @@ ventoy_do_dm_patch() {
     
     #step2: fill parameters
     vtPgsize=$(vtoytool vtoyksym -p)
-    vtoytool vtoykmod -f /tmp/dm_patch.ko $vtPgsize 0x$printk_addr 0x$ro_addr 0x$rw_addr $get_addr $get_size $put_addr $put_size 0x$kprobe_reg_addr 0x$kprobe_unreg_addr $vtKv $vtDebug >>/tmp/vtoy.log 2>&1
+    vtoytool vtoykmod -f /tmp/dm_patch.ko $vtPgsize 0x$printk_addr 0x$ro_addr 0x$rw_addr $get_addr $get_size $put_addr $put_size 0x$kprobe_reg_addr 0x$kprobe_unreg_addr $vtKv $vtIBT $vtDebug >>/tmp/vtoy.log 2>&1
 
     ventoy_check_insmod
     insmod /tmp/dm_patch.ko >>/tmp/vtoy.log 2>&1
