@@ -59,7 +59,7 @@ EOF
 
 
 echo "updating the initramfs, please wait ..."
-dracut -f --no-hostonly
+dracut -f 
 
 if [ -e /sys/firmware/efi ]; then
     if [ -e /dev/mapper/ventoy ]; then
