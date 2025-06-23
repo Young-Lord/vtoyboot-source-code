@@ -51,6 +51,5 @@ for ef in dd sort head find basename xzcat zcat; do
 done
 
 copy_exec /sbin/vtoytool    /sbin
-copy_exec /sbin/vtoydmpatch /sbin
 copy_exec /sbin/vtoypartx   /sbin
 copy_exec /sbin/vtoydump    /sbin
