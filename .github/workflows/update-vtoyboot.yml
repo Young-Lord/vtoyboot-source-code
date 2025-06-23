@@ -79,7 +79,13 @@ jobs:
 
             # Release
             wget -q "$iso_url"
-            gh release create "$tag_name" -t "$tag_name" vtoyboot*.{iso,tar.gz}
+            if [[ $iso_url == *.iso ]]
+            then
+              filelist=*.iso
+            else
+              filelist=*.tar.gz
+            fi
+            gh release create "$tag_name" -t "$tag_name" $filelist
           done
 
       - name: Force push updates and tags
