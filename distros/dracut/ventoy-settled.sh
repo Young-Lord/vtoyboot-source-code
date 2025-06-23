@@ -144,6 +144,12 @@ ventoy_do_dm_patch() {
     vtLine=$(vtoytool vtoyksym blkdev_put /tmp/kallsyms)        
     blkdev_put_addr=$(echo $vtLine | awk '{print $1}')
     
+    vtLine=$(vtoytool vtoyksym bdev_open_by_dev /tmp/kallsyms)    
+    bdev_open_addr=$(echo $vtLine | awk '{print $1}')
+    
+    vtLine=$(vtoytool vtoyksym bdev_file_open_by_dev /tmp/kallsyms)    
+    bdev_file_open_by_dev=$(echo $vtLine | awk '{print $1}')
+    
     if grep -m1 -q 'close_table_device.isra' /tmp/kallsyms; then
         vtLine=$(vtoytool vtoyksym close_table_device.isra /tmp/kallsyms)
     else
@@ -176,7 +182,7 @@ ventoy_do_dm_patch() {
     fi
     
     if [ -z "$printk_addr" ]; then
-        printk_addr=$($GREP ' _printk$' /proc/kallsyms | awk '{print $1}')
+        printk_addr=$(grep ' _printk$' /proc/kallsyms | awk '{print $1}')
     fi
     
     if ventoy_need_proc_ibt; then
@@ -190,11 +196,12 @@ ventoy_do_dm_patch() {
     #printk_addr=$(grep ' printk$' /proc/kallsyms | awk '{print $1}')
     #vtDebug="-v"
 
-    ventoy_log get_addr=$get_addr  get_size=$get_size
+    ventoy_log get_addr=$get_addr  get_size=$get_size vtDebug=$vtDebug
     ventoy_log put_addr=$put_addr  put_size=$put_size
     ventoy_log blkdev_get_addr=$blkdev_get_addr blkdev_put_addr=$blkdev_put_addr
     ventoy_log kprobe_reg_addr=$kprobe_reg_addr  kprobe_unreg_addr=$kprobe_unreg_addr
-    ventoy_log ro_addr=$ro_addr  rw_addr=$rw_addr  printk_addr=$printk_addr
+    ventoy_log ro_addr=$ro_addr  rw_addr=$rw_addr  printk_addr=$printk_addr 
+    ventoy_log bdev_open_addr=$bdev_open_addr bdev_file_open_by_dev=$bdev_file_open_by_dev
 
     if [ "$get_addr" = "0" -o "$put_addr" = "0" ]; then
         ventoy_log "Invalid symbol address"
@@ -208,6 +215,7 @@ ventoy_do_dm_patch() {
     vtKv=$(uname -r)
     vtKVMajor=$(echo $vtKv | awk -F. '{print $1}')
     vtKVMinor=$(echo $vtKv | awk -F. '{print $2}')
+    vtKVSubMinor=$(echo $vtKv | awk -F. '{print $3}')
     
     if [ ! -d /lib/modules/$vtKv ]; then
         ventoy_log "No modules directory found"
@@ -249,7 +257,7 @@ ventoy_do_dm_patch() {
     
     #step2: fill parameters
     vtPgsize=$(vtoytool vtoyksym -p)
-    vtoytool vtoykmod -f /tmp/dm_patch.ko $vtPgsize 0x$printk_addr 0x$ro_addr 0x$rw_addr $get_addr $get_size $put_addr $put_size 0x$kprobe_reg_addr 0x$kprobe_unreg_addr $vtKVMajor $vtIBT $vtKVMinor $blkdev_get_addr $blkdev_put_addr $vtDebug >>/tmp/vtoy.log 2>&1
+    vtoytool vtoykmod -f /tmp/dm_patch.ko $vtPgsize 0x$printk_addr 0x$ro_addr 0x$rw_addr $get_addr $get_size $put_addr $put_size 0x$kprobe_reg_addr 0x$kprobe_unreg_addr $vtKVMajor $vtIBT $vtKVMinor $blkdev_get_addr $blkdev_put_addr $vtKVSubMinor $bdev_open_addr $bdev_file_open_by_dev $vtDebug >>/tmp/vtoy.log 2>&1
 
     ventoy_check_insmod
     insmod /tmp/dm_patch.ko >>/tmp/vtoy.log 2>&1
