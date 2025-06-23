@@ -87,16 +87,12 @@ disable_grub_os_probe
 #wrapper grub-probe
 echo "grub mkconfig ..."
 PROBE_PATH=$(find_grub_probe_path)
-EDITENV_PATH=$(find_grub_editenv_path)
 MKCONFIG_PATH=$(find_grub_mkconfig_path)
-echo "PROBE_PATH=$PROBE_PATH EDITENV_PATH=$EDITENV_PATH MKCONFIG_PATH=$MKCONFIG_PATH"
+echo "PROBE_PATH=$PROBE_PATH MKCONFIG_PATH=$MKCONFIG_PATH"
 
 if [ -e "$PROBE_PATH" -a -e "$MKCONFIG_PATH" ]; then
     wrapper_grub_probe $PROBE_PATH
-    if [ -e "$EDITENV_PATH" ]; then
-        wrapper_grub_editenv $EDITENV_PATH
-    fi
-
+    
     GRUB_CFG_PATH=$(find_grub_config_path)
     if [ -f "$GRUB_CFG_PATH" ]; then
         echo "$MKCONFIG_PATH -o $GRUB_CFG_PATH"
