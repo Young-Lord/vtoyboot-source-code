@@ -40,26 +40,31 @@ jobs:
           while read release; do
             find . -maxdepth 1 ! -name '.git' ! -name '.github' ! -name '.' -exec rm -rf {} +
             tag_name=$(jq -r '.tag_name' <<< "$release")
-            iso_url=$(jq -r '.assets | select(contains("vtoyboot-") and endswith(".iso"))' <<< "$release")
+            iso_url=$(jq -r '.assets | select(contains("vtoyboot-") and (endswith(".iso") or endswith(".tar.gz")))' <<< "$release")
 
             if [ -z "$iso_url" ]; then
               echo "⚠️ Skipping $tag_name (no ISO asset)"
               continue
             fi
 
-            if git rev-parse "refs/tags/$tag_name" &>/dev/null; then
-              echo "✅ $tag_name already processed"
-              continue
-            fi
+            #if git rev-parse "refs/tags/$tag_name" &>/dev/null; then
+            #  echo "✅ $tag_name already processed"
+            #  continue
+            #fi
 
             echo "🚀 Processing $tag_name: $iso_url"
 
             # Download and extract ISO
-            wget -q "$iso_url" -O vtoyboot.iso
-            sudo apt-get install -y p7zip-full
-            7z x vtoyboot.iso -y
-            tar xvf vtoyboot-*.tar.gz
-            rm vtoyboot.iso vtoyboot-*.tar.gz
+            if [[ $iso_url == *.iso ]]
+            then
+              wget -q "$iso_url" -O vtoyboot.iso
+              sudo apt-get install -y p7zip-full
+              7z x vtoyboot.iso -y
+            else
+              wget -q "$iso_url" -O vtoyboot.tar.gz
+            fi
+            tar xvf vtoyboot*.tar.gz
+            rm -f vtoyboot.iso vtoyboot*.tar.gz
 
             # Commit changes
             git config user.name "github-actions[bot]"
