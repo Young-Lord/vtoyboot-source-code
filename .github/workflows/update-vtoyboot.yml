@@ -26,8 +26,7 @@ jobs:
           gh api "repos/ventoy/vtoyboot/releases" \
             --paginate \
             --jq '.[] | {tag_name: .tag_name, assets: .assets[].browser_download_url}' \
-            > releases.json
-          echo "releases=$(jq -s . releases.json)" >> $GITHUB_OUTPUT
+            > ../releases.json
 
       - name: Process releases and update repo
         env:
@@ -38,7 +37,7 @@ jobs:
           git add README.md
 
           # Process each release from JSON
-          jq -c '.[]' <<< "${{ steps.fetch-releases.outputs.releases }}" | while read release; do
+          jq -c '.[]' < ../releases.json | while read release; do
             tag_name=$(jq -r '.tag_name' <<< "$release")
             iso_url=$(jq -r '.assets | select(contains("vtoyboot-") and endswith(".iso"))' <<< "$release")
 
@@ -58,10 +57,7 @@ jobs:
             wget -q "$iso_url" -O vtoyboot.iso
             sudo apt-get install -y p7zip-full
             7z x vtoyboot.iso -y
-            rm vtoyboot.iso
-
-            # Clean repo (preserve .git and README)
-            find . -mindepth 1 ! -name '.git' ! -name 'README.md' -exec rm -rf {} +
+            rm vtoyboot.iso 
 
             # Commit changes
             git config user.name "github-actions[bot]"
