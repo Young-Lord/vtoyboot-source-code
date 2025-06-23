@@ -19,51 +19,6 @@
 
 type getarg >/dev/null 2>&1 || . /lib/dracut-lib.sh
 
-###########################
-###########################
-#AUTO_INSERT_COMMON_FUNC
-
-ventoy_check_efivars() {
-    if [ -e /sys/firmware/efi ]; then
-        if grep -q efivar /proc/mounts; then
-            :
-        else
-            if [ -e /sys/firmware/efi/efivars ]; then
-                mount -t efivarfs efivarfs /sys/firmware/efi/efivars  >/dev/null 2>&1
-            fi
-        fi
-    fi
-}
-
-ventoy_log() {
-    echo "$@" >> /tmp/vtoy.log
-}
-
-
-ventoy_check_insmod() {
-    if [ -f /bin/kmod ]; then
-        [ -f /bin/insmod ] || ln -s /bin/kmod /bin/insmod
-        [ -f /bin/lsmod ]  || ln -s /bin/kmod /bin/lsmod
-    fi
-}
-
-ventoy_dm_create_ventoy() {    
-    dmsetup create ventoy /ventoy_table
-    
-    RAWDISKNAME=$(head -n1 /ventoy_table | awk '{print $4}')
-    RAWDISKSHORT=${RAWDISKNAME#/dev/}
-    RAWDISKSECS=$(cat /sys/class/block/$RAWDISKSHORT/size)
-    
-    echo "0 $RAWDISKSECS linear $RAWDISKNAME 0" > /ventoy_raw_table      
-    dmsetup create $RAWDISKSHORT  /ventoy_raw_table    
-    
-    vret=$?    
-    return $vret
-}
-
-#check for efivarfs
-ventoy_check_efivars
-
 if ! vtoydump > /dev/null 2>&1; then
     info 'vtoydump failed'
     return
@@ -76,32 +31,13 @@ if dmsetup ls | grep -q ventoy; then
 fi
 
 
-#flush multipath before dmsetup
-multipath -F > /dev/null 2>&1
-
 vtoydump -L > /ventoy_table
-if ventoy_dm_create_ventoy; then
-    :
-else
-    sleep 3
-    multipath -F > /dev/null 2>&1
-    ventoy_dm_create_ventoy
-fi
+dmsetup create ventoy /ventoy_table
 
 DEVDM=/dev/mapper/ventoy
 
-loop=0
 while ! [ -e $DEVDM ]; do
     sleep 0.5
-    let loop+=1
-    if [ $loop -gt 10 ]; then
-        echo "Waiting for ventoy device ..." > /dev/console
-    fi
-
-    if [ $loop -gt 10 -a $loop -lt 15 ]; then
-        multipath -F > /dev/null 2>&1
-        ventoy_dm_create_ventoy
-    fi
 done
 
 for ID in $(vtoypartx $DEVDM -oNR | grep -v NR); do
@@ -114,4 +50,3 @@ done
 
 rm -f /ventoy_table
 rm -f /ventoy_part_table
-

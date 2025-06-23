@@ -18,22 +18,14 @@
 #************************************************************************************
 
 build() {
-    add_binary "dd"
-    add_binary "sort"
-    add_binary "head"
-    add_binary "find"
-    add_binary "xzcat"
-    add_binary "zcat"
-    add_binary "basename"
     add_binary "vtoydump"
     add_binary "vtoypartx"
-    add_binary "vtoytool"
 
-    for md in $(cat /sbin/vtoydrivers); do
-        if [ -n "$md" ]; then
-            if modinfo -n $md 2>/dev/null | grep -q '\.ko'; then
-                add_module $md
-            fi
+    addon_drivers="usb-storage mptsas mptspi efivars"
+
+    for md in $addon_drivers; do
+        if modinfo -n $md 2>/dev/null | grep -q '\.ko'; then
+            add_module $md
         fi
     done
 
