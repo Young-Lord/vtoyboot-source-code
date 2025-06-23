@@ -317,22 +317,18 @@ replace_shim_efi() {
     vBOOTX64=$(find /boot/efi/EFI -type f | grep -i /efi/boot/bootx64.efi)
     
     vCnt=$(find /boot/efi/EFI -type f | grep -i shimx64.efi | wc -l)
-    if [ $vCnt -le 0 ]; then
+    if [ $vCnt -ne 1 ]; then
         echo "shimx64.efi no need $vCnt"
         return
     fi    
-    vSHIMX64=$(find /boot/efi/EFI -type f | grep -m1 -i shimx64.efi)
+    vSHIMX64=$(find /boot/efi/EFI -type f | grep -i shimx64.efi)
     
     vCnt=$(find /boot/efi/EFI -type f | grep -i grubx64.efi | wc -l)
-    if [ $vCnt -le 0 ]; then
+    if [ $vCnt -ne 1 ]; then
         echo "grubx64.efi no need $vCnt"
         return
     fi    
-    vGRUBX64=$(find /boot/efi/EFI -type f | grep -m1 -i grubx64.efi)
-    
-    echo vBOOTX64=$vBOOTX64
-    echo vSHIMX64=$vSHIMX64
-    echo vGRUBX64=$vGRUBX64
+    vGRUBX64=$(find /boot/efi/EFI -type f | grep -i grubx64.efi)
     
     vMD51=$(md5sum $vBOOTX64 | awk '{print $1}')
     vMD52=$(md5sum $vSHIMX64 | awk '{print $1}')
