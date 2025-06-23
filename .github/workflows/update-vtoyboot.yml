@@ -1,0 +1,79 @@
+name: Update vtoyboot Releases
+
+on:
+  schedule:
+    - cron: '0 0 */15 * *'  # Runs at midnight UTC every 15 days
+  workflow_dispatch:         # Manual trigger via GitHub UI
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # Required for force-pushing
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # Required for full git history/tagging
+
+      - name: Fetch all vtoyboot releases
+        id: fetch-releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Use GitHub CLI to list releases (authenticated via GITHUB_TOKEN)
+          gh api "repos/ventoy/vtoyboot/releases" \
+            --paginate \
+            --jq '.[] | {tag_name: .tag_name, assets: .assets[].browser_download_url}' \
+            > releases.json
+          echo "releases=$(jq -s . releases.json)" >> $GITHUB_OUTPUT
+
+      - name: Process releases and update repo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Prepend vtoyboot link to README.md
+          echo -e "Unpacked files of [vtoyboot](https://github.com/ventoy/vtoyboot).\n\n$(cat README.md 2>/dev/null)" > README.md
+          git add README.md
+
+          # Process each release from JSON
+          jq -c '.[]' <<< "${{ steps.fetch-releases.outputs.releases }}" | while read release; do
+            tag_name=$(jq -r '.tag_name' <<< "$release")
+            iso_url=$(jq -r '.assets | select(contains("vtoyboot-") and endswith(".iso"))' <<< "$release")
+
+            if [ -z "$iso_url" ]; then
+              echo "⚠️ Skipping $tag_name (no ISO asset)"
+              continue
+            fi
+
+            if git rev-parse "refs/tags/$tag_name" &>/dev/null; then
+              echo "✅ $tag_name already processed"
+              continue
+            fi
+
+            echo "🚀 Processing $tag_name: $iso_url"
+
+            # Download and extract ISO
+            wget -q "$iso_url" -O vtoyboot.iso
+            sudo apt-get install -y p7zip-full
+            7z x vtoyboot.iso -y
+            rm vtoyboot.iso
+
+            # Clean repo (preserve .git and README)
+            find . -mindepth 1 ! -name '.git' ! -name 'README.md' -exec rm -rf {} +
+
+            # Commit changes
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Update to vtoyboot $tag_name"
+
+            # Tag release
+            git tag -a "$tag_name" -m "vtoyboot $tag_name"
+          done
+
+      - name: Force push updates and tags
+        run: |
+          git push --force origin HEAD:${{ github.ref_name }}
+          git push --force origin --tags
