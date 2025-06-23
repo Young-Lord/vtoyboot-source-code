@@ -17,15 +17,7 @@
 # 
 #************************************************************************************
 
-vtoy_version=1.0.36
-
-if echo "$*" | grep -q __vtoyloop__; then
-    :
-else
-    if readlink /proc/$$/exe | grep -q dash; then
-        exec /bin/bash $0 $* __vtoyloop__
-    fi
-fi
+vtoy_version=1.0.0
 
 vtoy_get_initrdtool_type() {  
     . ./distros/initramfstool/check.sh
@@ -64,16 +56,6 @@ if ! [ -d ./distros ]; then
     exit 1
 fi
 
-if [ -e /dev/mapper/ventoy ]; then
-    :
-else    
-    if ls -1 /dev | grep -q '[svh]db$'; then
-        echo "More than one disks found. Currently only one disk is supported."
-        echo ""
-        exit 1
-    fi
-fi
-
 initrdtool=$(vtoy_get_initrdtool_type)
 
 if ! [ -f ./distros/$initrdtool/vtoy.sh ]; then
@@ -81,68 +63,20 @@ if ! [ -f ./distros/$initrdtool/vtoy.sh ]; then
     exit 1
 fi
 
-vtoyboot_need_proc_ibt() {
-    vtTool=$1
-    vtKv=$(uname -r)
-    vtMajor=$(echo $vtKv | awk -F. '{print $1}')
-    vtMinor=$(echo $vtKv | awk -F. '{print $2}')
-    
-    #ibt was supported since linux kernel 5.18
-    if [ $vtMajor -lt 5 ]; then
-        false; return
-    elif [ $vtMajor -eq 5 ]; then
-        if [ $vtMajor -lt 18 ]; then
-            false; return
-        fi
-    fi
-    
-    if grep -q ' ibt=off' /proc/cmdline; then
-        false; return
-    fi
-
-    #hardware CPU doesn't support IBT
-    if $vtTool vtoykmod -I; then
-        :
-    else
-        false; return
-    fi
-    
-    #dot.CONFIG not enabled
-    if grep -q ' ibt_restore$' /proc/kallsyms; then
-        :
-    else
-        false; return
-    fi
-    
-    true
-}
 
 #prepare vtoydump
 if uname -a | grep -Eq "x86_64|amd64"; then
     vtdumpcmd=./tools/vtoydump64
     partxcmd=./tools/vtoypartx64
-    vtcheckcmd=./tools/vtoycheck64
-    vtoytool=./tools/vtoytool_64
-elif uname -a | grep -Eq "aarch64|arm64"; then
-    vtdumpcmd=./tools/vtoydumpaa64
-    partxcmd=./tools/vtoypartxaa64
-    vtcheckcmd=./tools/vtoycheckaa64
-    vtoytool=./tools/vtoytool_aa64
 else
     vtdumpcmd=./tools/vtoydump32
     partxcmd=./tools/vtoypartx32
-    vtcheckcmd=./tools/vtoycheck32
-    vtoytool=./tools/vtoytool_32
 fi
 
-chmod +x $vtdumpcmd $partxcmd $vtcheckcmd
-
-for vsh in $(ls ./distros/$initrdtool/*.sh); do
-    chmod +x $vsh
-done
+chmod +x $vtdumpcmd $partxcmd
 
 echo "Current system use $initrdtool as initramfs tool"
-. ./distros/$initrdtool/vtoy.sh "$@"
+. ./distros/$initrdtool/vtoy.sh 
 if [ $? -eq 0 ]; then
     sync
     echo ""

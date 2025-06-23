@@ -33,23 +33,13 @@ esac
 
 # Begin real processing below this line
 
-for md in $(cat /sbin/vtoydrivers); do
-    if [ -n "$md" ]; then
-        if modinfo -n $md 2>/dev/null | grep -q '\.ko'; then
-            force_load $md
-        fi
+addon_drivers="usb-storage mptsas mptspi efivars"
+
+for md in $addon_drivers; do
+    if modinfo -n $md 2>/dev/null | grep -q '\.ko'; then
+        force_load $md
     fi
 done
 
-for ef in dd sort head find basename xzcat zcat; do
-    for vp in /bin /sbin /usr/bin /usr/sbin; do
-        if [ -f $vp/$ef ]; then
-            copy_exec $vp/$ef /sbin
-            break
-        fi
-    done
-done
-
-copy_exec /sbin/vtoytool    /sbin
-copy_exec /sbin/vtoypartx   /sbin
-copy_exec /sbin/vtoydump    /sbin
+copy_exec /sbin/vtoypartx /sbin
+copy_exec /sbin/vtoydump  /sbin
