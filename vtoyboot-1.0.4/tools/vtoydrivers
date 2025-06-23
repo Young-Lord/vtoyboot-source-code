@@ -16,12 +16,3 @@ xhci-pci
 xhci-plat-hcd
 vhci-hcd
 usbhid
-sg
-uas
-pmcraid
-smartpqi
-megaraid
-megaraid_sas
-vmw_pvscsi
-mvsas
-aacraid
