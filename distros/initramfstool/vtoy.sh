@@ -48,6 +48,17 @@ vtoy_efi_fixup() {
     done
 }
 
+vtoy_fix_elementary_partuuid() {
+    if grep -q 'elementary OS' /etc/os-release; then
+        if grep -q '^PARTUUID=.* /boot/efi ' /etc/fstab; then
+            part=$(grep ' /boot/efi ' /proc/mounts | awk '{print $1}')
+            uuid=$(blkid -s UUID -o value $part)
+            sed -i "s#^PARTUUID=.* /boot/efi #UUID=$uuid /boot/efi #g" /etc/fstab
+            echo "Fix elementary OS PARTUUID $part"
+        fi
+    fi
+}
+
 . ./tools/efi_legacy_grub.sh
 
 vtoy_clean_env
@@ -85,13 +96,16 @@ if [ -e "$PROBE_PATH" -a -e "$MKCONFIG_PATH" ]; then
     fi
 fi
 
+
+
 #efi fixup 
 if [ -e /sys/firmware/efi ]; then
     if [ -e /dev/mapper/ventoy ]; then
         echo "This is ventoy enviroment"
     else
+        vtoy_fix_elementary_partuuid
         update_grub_config
-        install_legacy_bios_grub
+        install_legacy_bios_grub        
     fi
     
     if [ "$1" = "-s" ]; then
