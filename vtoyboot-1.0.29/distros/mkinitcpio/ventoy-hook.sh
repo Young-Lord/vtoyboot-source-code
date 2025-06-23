@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #************************************************************************************
 # Copyright (c) 2020, longpanda <admin@ventoy.net>
 # 
@@ -16,8 +16,6 @@
 # along with this program; if not, see <http://www.gnu.org/licenses/>.
 # 
 #************************************************************************************
-
-type getarg >/dev/null 2>&1 || . /lib/dracut-lib.sh
 
 ###########################
 ###########################
@@ -95,7 +93,6 @@ ventoy_need_proc_ibt() {
 
 
 ventoy_do_dm_patch() {
-    vtDmPatchDebug=0
     ventoy_log 'ventoy_do_dm_patch'
     if [ -f /tmp/dm_patch.ko ]; then
         if grep -q 'dm_patch' /proc/modules; then
@@ -152,14 +149,6 @@ ventoy_do_dm_patch() {
     kprobe_unreg_addr=$(grep ' unregister_kprobe$' /proc/kallsyms | awk '{print $1}')
     
     if [ "$VTOY_DEBUG_LEVEL" = "01" ]; then
-        vtDmPatchDebug=1
-    fi
-    
-    if grep -q 'dmpatch_debug' /proc/cmdline; then
-        vtDmPatchDebug=1
-    fi
-    
-    if [ $vtDmPatchDebug -eq 1 ]; then
         printk_addr=$(grep ' printk$' /proc/kallsyms | awk '{print $1}')
         vtDebug="-v"
     elif grep -q "vtdebug" /proc/cmdline; then
@@ -227,13 +216,10 @@ ventoy_do_dm_patch() {
         xzcat $vtModPath > /tmp/$vtModName
     elif echo $vtModPath | grep -q "[.]ko[.]gz$"; then
         zcat $vtModPath > /tmp/$vtModName
-    elif echo $vtModPath | grep -q "[.]ko[.]zst$"; then
-        zstdcat $vtModPath > /tmp/$vtModName
     else
         ventoy_log "unsupport module type"
         return
     fi
-
     
     #step1: modify vermagic/mod crc/relocation
     vtoytool vtoykmod -u /tmp/dm_patch.ko /tmp/$vtModName $vtDebug >>/tmp/vtoy.log 2>&1
@@ -247,8 +233,6 @@ ventoy_do_dm_patch() {
     
     if grep -q 'dm_patch' /proc/modules; then
         ventoy_log "dm_patch success"
-    else
-        ventoy_log "dm_patch failed"
     fi
 }
 
@@ -295,59 +279,73 @@ ventoy_dm_patch_proc_end() {
     fi
 }
 
-#check for efivarfs
-ventoy_check_efivars
 
-if ! vtoydump > /dev/null 2>&1; then
-    info 'vtoydump failed'
-    return
-fi
+vtoy_wait_for_device() {
+	local i=100
 
-#already done
-if dmsetup ls | grep -q ventoy; then
-    info 'ventoy already exist'
-    return
-fi
+    while [ $i -gt 0 ]; do		
+		if vtoydump > /dev/null 2>&1; then
+			break
+		else
+			sleep 0.2
+		fi
+        i=$((i - 1))
+    done
+}
 
-ventoy_dm_patch_proc_begin
-
-#flush multipath before dmsetup
-multipath -F > /dev/null 2>&1
-
-vtoydump -L > /ventoy_table
-if ventoy_dm_create_ventoy; then
-    :
-else
-    sleep 3
+vtoy_device_mapper_proc() {
+    #flush multipath before dmsetup
     multipath -F > /dev/null 2>&1
-    ventoy_dm_create_ventoy
-fi
 
-DEVDM=/dev/mapper/ventoy
-
-loop=0
-while ! [ -e $DEVDM ]; do
-    sleep 0.5
-    let loop+=1
-    if [ $loop -gt 10 ]; then
-        echo "Waiting for ventoy device ..." > /dev/console
-    fi
-
-    if [ $loop -gt 10 -a $loop -lt 15 ]; then
+    vtoydump -L > /ventoy_table
+    if ventoy_dm_create_ventoy; then
+        :
+    else
+        sleep 3
         multipath -F > /dev/null 2>&1
         ventoy_dm_create_ventoy
     fi
-done
 
-for ID in $(vtoypartx $DEVDM -oNR | grep -v NR); do
-    PART_START=$(vtoypartx  $DEVDM -n$ID -oSTART,SECTORS | grep -v START | awk '{print $1}')
-    PART_SECTOR=$(vtoypartx $DEVDM -n$ID -oSTART,SECTORS | grep -v START | awk '{print $2}')
+    DEVDM=/dev/mapper/ventoy
+
+    loop=0
+    while ! [ -e $DEVDM ]; do
+        sleep 0.5
+        let loop+=1
+        if [ $loop -gt 10 ]; then
+            echo "Waiting for ventoy device ..." > /dev/console
+        fi
+        
+        if [ $loop -gt 10 -a $loop -lt 15 ]; then
+            multipath -F > /dev/null 2>&1
+            ventoy_dm_create_ventoy
+        fi
+    done
+
+    for ID in $(vtoypartx $DEVDM -oNR | grep -v NR); do
+        PART_START=$(vtoypartx  $DEVDM -n$ID -oSTART,SECTORS | grep -v START | awk '{print $1}')
+        PART_SECTOR=$(vtoypartx $DEVDM -n$ID -oSTART,SECTORS | grep -v START | awk '{print $2}')
+        
+        echo "0 $PART_SECTOR linear $DEVDM $PART_START" > /ventoy_part_table    
+        dmsetup create ventoy$ID /ventoy_part_table
+    done
+
+    rm -f /ventoy_table
+    rm -f /ventoy_part_table
+}
+
+run_hook() {
+    #check for efivarfs
+    ventoy_check_efivars
     
-    echo "0 $PART_SECTOR linear $DEVDM $PART_START" > /ventoy_part_table    
-    dmsetup create ventoy$ID /ventoy_part_table
-done
+	if vtoydump -c >/dev/null 2>/dev/null; then
+		vtoy_wait_for_device
+		if vtoydump > /dev/null 2>&1; then
+            ventoy_dm_patch_proc_begin
+			vtoy_device_mapper_proc
+            ventoy_dm_patch_proc_end
+		fi
+	fi
+}
 
-rm -f /ventoy_table
-rm -f /ventoy_part_table
 
-ventoy_dm_patch_proc_end
