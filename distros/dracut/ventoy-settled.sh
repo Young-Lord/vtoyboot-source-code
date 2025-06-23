@@ -124,6 +124,10 @@ ventoy_do_dm_patch() {
         printk_addr=0
     fi
     
+    if [ -z "$printk_addr" ]; then
+        printk_addr=$($GREP ' _printk$' /proc/kallsyms | awk '{print $1}')
+    fi
+    
     #printk_addr=$(grep ' printk$' /proc/kallsyms | awk '{print $1}')
     #vtDebug="-v"
 
