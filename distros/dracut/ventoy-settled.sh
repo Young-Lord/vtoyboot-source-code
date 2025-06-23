@@ -60,6 +60,20 @@ ventoy_check_insmod() {
 
 ventoy_do_dm_patch() {
     ventoy_log 'ventoy_do_dm_patch'
+    if [ -f /tmp/dm_patch.ko ]; then
+        if grep -q 'dm_patch' /proc/modules; then
+            ventoy_log "dm_patch already exist"
+        else
+            ventoy_log "dm_patch reinstall"
+            insmod /tmp/dm_patch.ko >>/tmp/vtoy.log 2>&1    
+            if grep -q 'dm_patch' /proc/modules; then
+                ventoy_log "dm_patch reinstall success"
+            else
+                ventoy_log "dm_patch reinstall failed"
+            fi
+        fi
+        return 
+    fi
 
     if [ -f /bin/vtoydump ]; then
         vtHeadSize=$(stat -c '%s' /bin/vtoydump)
@@ -79,11 +93,19 @@ ventoy_do_dm_patch() {
     
     cat /proc/kallsyms | sort > /tmp/kallsyms
 
-    vtLine=$(vtoytool vtoyksym dm_get_table_device /tmp/kallsyms)
+    if grep -m1 -q 'open_table_device.isra' /tmp/kallsyms; then
+        vtLine=$(vtoytool vtoyksym open_table_device.isra /tmp/kallsyms)
+    else
+        vtLine=$(vtoytool vtoyksym dm_get_table_device /tmp/kallsyms)
+    fi    
     get_addr=$(echo $vtLine | awk '{print $1}')
     get_size=$(echo $vtLine | awk '{print $2}')
 
-    vtLine=$(vtoytool vtoyksym dm_put_table_device /tmp/kallsyms)
+    if grep -m1 -q 'close_table_device.isra' /tmp/kallsyms; then
+        vtLine=$(vtoytool vtoyksym close_table_device.isra /tmp/kallsyms)
+    else
+        vtLine=$(vtoytool vtoyksym dm_put_table_device /tmp/kallsyms)
+    fi
     put_addr=$(echo $vtLine | awk '{print $1}')
     put_size=$(echo $vtLine | awk '{print $2}')
     
@@ -95,11 +117,14 @@ ventoy_do_dm_patch() {
     if [ "$VTOY_DEBUG_LEVEL" = "01" ]; then
         printk_addr=$(grep ' printk$' /proc/kallsyms | awk '{print $1}')
         vtDebug="-v"
+    elif grep -q "vtdebug" /proc/cmdline; then
+        printk_addr=$(grep ' printk$' /proc/kallsyms | awk '{print $1}')
+        vtDebug="-v"
     else
         printk_addr=0
     fi
     
-    #printk_addr=$(grep ' printk$' /proc/kallsyms | $AWK '{print $1}')
+    #printk_addr=$(grep ' printk$' /proc/kallsyms | awk '{print $1}')
     #vtDebug="-v"
 
     ventoy_log get_addr=$get_addr  get_size=$get_size
@@ -132,6 +157,7 @@ ventoy_do_dm_patch() {
     fi
     
     vtModName=$(basename $vtModPath)
+    [ -f /tmp/$vtModName ] && rm -f /tmp/$vtModName
     
     ventoy_log "template module is $vtModPath $vtModName"
     
@@ -150,14 +176,14 @@ ventoy_do_dm_patch() {
     fi
     
     #step1: modify vermagic/mod crc/relocation
-    vtoytool vtoykmod -u /tmp/dm_patch.ko /tmp/$vtModName $vtDebug
+    vtoytool vtoykmod -u /tmp/dm_patch.ko /tmp/$vtModName $vtDebug >>/tmp/vtoy.log 2>&1
     
     #step2: fill parameters
     vtPgsize=$(vtoytool vtoyksym -p)
-    vtoytool vtoykmod -f /tmp/dm_patch.ko $vtPgsize 0x$printk_addr 0x$ro_addr 0x$rw_addr $get_addr $get_size $put_addr $put_size 0x$kprobe_reg_addr 0x$kprobe_unreg_addr $vtDebug
+    vtoytool vtoykmod -f /tmp/dm_patch.ko $vtPgsize 0x$printk_addr 0x$ro_addr 0x$rw_addr $get_addr $get_size $put_addr $put_size 0x$kprobe_reg_addr 0x$kprobe_unreg_addr $vtDebug >>/tmp/vtoy.log 2>&1
 
     ventoy_check_insmod
-    insmod /tmp/dm_patch.ko
+    insmod /tmp/dm_patch.ko >>/tmp/vtoy.log 2>&1
     
     if grep -q 'dm_patch' /proc/modules; then
         ventoy_log "dm_patch success"
@@ -172,11 +198,32 @@ ventoy_dm_patch_proc_begin() {
         export vtLevel3=$(cat /proc/sys/kernel/printk | awk '{print $3}')
         export vtLevel4=$(cat /proc/sys/kernel/printk | awk '{print $4}')
         
-        ventoy_do_dm_patch
-        
         #suppress printk message
         echo 0 $vtLevel2 0 $vtLevel4 > /proc/sys/kernel/printk
     fi
+}
+
+ventoy_dm_patch_install() {
+    if ventoy_need_dm_patch; then
+        ventoy_do_dm_patch
+    fi
+}
+
+ventoy_dm_patch_remove() {
+    if ventoy_need_dm_patch; then  
+        if grep -q 'dm_patch' /proc/modules; then
+            ventoy_log "remove dm_patch"
+            rmmod dm_patch
+        fi
+    fi
+}
+
+ventoy_dm_create_ventoy() {
+    ventoy_dm_patch_install
+    dmsetup create ventoy /ventoy_table
+    vret=$?
+    ventoy_dm_patch_remove
+    return $vret
 }
 
 ventoy_dm_patch_proc_end() {
@@ -206,12 +253,12 @@ ventoy_dm_patch_proc_begin
 multipath -F > /dev/null 2>&1
 
 vtoydump -L > /ventoy_table
-if dmsetup create ventoy /ventoy_table; then
+if ventoy_dm_create_ventoy; then
     :
 else
     sleep 3
     multipath -F > /dev/null 2>&1
-    dmsetup create ventoy /ventoy_table
+    ventoy_dm_create_ventoy
 fi
 
 DEVDM=/dev/mapper/ventoy
@@ -226,7 +273,7 @@ while ! [ -e $DEVDM ]; do
 
     if [ $loop -gt 10 -a $loop -lt 15 ]; then
         multipath -F > /dev/null 2>&1
-        dmsetup create ventoy /ventoy_table
+        ventoy_dm_create_ventoy
     fi
 done
 
