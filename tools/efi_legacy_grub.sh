@@ -15,6 +15,17 @@ disable_grub_os_probe() {
     done
 }
 
+
+find_grub_editenv_path() {
+    if which grub-editenv >/dev/null 2>&1; then
+        which grub-editenv
+    elif which grub2-editenv >/dev/null 2>&1; then
+        which grub2-editenv
+    else
+        echo "XXX"
+    fi
+}
+
 find_grub_probe_path() {
     if which grub-probe >/dev/null 2>&1; then
         which grub-probe
@@ -269,6 +280,24 @@ wrapper_grub_probe() {
     cp -a "$1" "${1}-bk"
     rm -f "$1"
     cp -a ./tools/grub-probe.sh "$1"
+    
+    chmod +x "$1"
+    chmod +x "${1}-bk"
+}
+
+wrapper_grub_editenv() {
+    if [ -e "${1}-bk" ]; then
+        if grep -q '#!' "$1"; then
+            rm -f "$1"
+            mv "${1}-bk" "$1"
+        else
+            rm -f "${1}-bk"
+        fi
+    fi
+
+    cp -a "$1" "${1}-bk"
+    rm -f "$1"
+    cp -a ./tools/grub-editenv.sh "$1"
     
     chmod +x "$1"
     chmod +x "${1}-bk"
