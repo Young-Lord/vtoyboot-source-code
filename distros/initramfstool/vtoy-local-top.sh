@@ -93,6 +93,7 @@ ventoy_need_proc_ibt() {
 
 
 ventoy_do_dm_patch() {
+    vtDmPatchDebug=0
     ventoy_log 'ventoy_do_dm_patch'
     if [ -f /tmp/dm_patch.ko ]; then
         if grep -q 'dm_patch' /proc/modules; then
@@ -149,6 +150,14 @@ ventoy_do_dm_patch() {
     kprobe_unreg_addr=$(grep ' unregister_kprobe$' /proc/kallsyms | awk '{print $1}')
     
     if [ "$VTOY_DEBUG_LEVEL" = "01" ]; then
+        vtDmPatchDebug=1
+    fi
+    
+    if grep -q 'dmpatch_debug' /proc/cmdline; then
+        vtDmPatchDebug=1
+    fi
+    
+    if [ $vtDmPatchDebug -eq 1 ]; then
         printk_addr=$(grep ' printk$' /proc/kallsyms | awk '{print $1}')
         vtDebug="-v"
     elif grep -q "vtdebug" /proc/cmdline; then
@@ -216,10 +225,13 @@ ventoy_do_dm_patch() {
         xzcat $vtModPath > /tmp/$vtModName
     elif echo $vtModPath | grep -q "[.]ko[.]gz$"; then
         zcat $vtModPath > /tmp/$vtModName
+    elif echo $vtModPath | grep -q "[.]ko[.]zst$"; then
+        zstdcat $vtModPath > /tmp/$vtModName
     else
         ventoy_log "unsupport module type"
         return
     fi
+
     
     #step1: modify vermagic/mod crc/relocation
     vtoytool vtoykmod -u /tmp/dm_patch.ko /tmp/$vtModName $vtDebug >>/tmp/vtoy.log 2>&1
@@ -233,6 +245,8 @@ ventoy_do_dm_patch() {
     
     if grep -q 'dm_patch' /proc/modules; then
         ventoy_log "dm_patch success"
+    else
+        ventoy_log "dm_patch failed"
     fi
 }
 
