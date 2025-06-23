@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #************************************************************************************
 # Copyright (c) 2020, longpanda <admin@ventoy.net>
 # 
@@ -18,41 +18,27 @@
 #************************************************************************************
 
 vtoy_wait_for_device() {
-    while ! vtoydump > /dev/null 2>&1; do
-        sleep 0.5
+	local i=100
+
+    while [ $i -gt 0 ]; do		
+		if vtoydump > /dev/null 2>&1; then
+			break
+		else
+			sleep 0.2
+		fi
+        i=$((i - 1))
     done
 }
 
 vtoy_device_mapper_proc() {
-    #flush multipath before dmsetup
-    multipath -F > /dev/null 2>&1
-
     vtoydump -L > /ventoy_table
-    if dmsetup create ventoy /ventoy_table; then
-        :
-    else
-        sleep 3
-        multipath -F > /dev/null 2>&1
-        dmsetup create ventoy /ventoy_table
-    fi
-
+    dmsetup create ventoy /ventoy_table
 
     DEVDM=/dev/mapper/ventoy
 
-    loop=0
     while ! [ -e $DEVDM ]; do
         sleep 0.5
-        let loop+=1
-        if [ $loop -gt 10 ]; then
-            echo "Waiting for ventoy device ..." > /dev/console
-        fi
-        
-        if [ $loop -gt 10 -a $loop -lt 15 ]; then
-            multipath -F > /dev/null 2>&1
-            dmsetup create ventoy /ventoy_table
-        fi
     done
-
 
     for ID in $(vtoypartx $DEVDM -oNR | grep -v NR); do
         PART_START=$(vtoypartx  $DEVDM -n$ID -oSTART,SECTORS | grep -v START | awk '{print $1}')
@@ -66,26 +52,14 @@ vtoy_device_mapper_proc() {
     rm -f /ventoy_part_table
 }
 
-case $1 in
-    prereqs)
-       exit 0
-       ;;
-esac
+run_hook() {
+	
+	if vtoydump -c >/dev/null 2>/dev/null; then
+		vtoy_wait_for_device
+		if vtoydump > /dev/null 2>&1; then
+			vtoy_device_mapper_proc
+		fi
+	fi
+}
 
-
-#check for efivarfs
-if [ -e /sys/firmware/efi ]; then
-    if grep -q efivar /proc/mounts; then
-        :
-    else
-        if [ -e /sys/firmware/efi/efivars ]; then
-            mount -t efivarfs efivarfs /sys/firmware/efi/efivars >/dev/null 2>&1
-        fi
-    fi
-fi
-
-if vtoydump -c > /dev/null 2>&1; then
-    vtoy_wait_for_device
-    vtoy_device_mapper_proc
-fi
 
