@@ -136,6 +136,12 @@ ventoy_do_dm_patch() {
     get_addr=$(echo $vtLine | awk '{print $1}')
     get_size=$(echo $vtLine | awk '{print $2}')
 
+    vtLine=$(vtoytool vtoyksym blkdev_get_by_dev /tmp/kallsyms) 
+    blkdev_get_addr=$(echo $vtLine | awk '{print $1}')
+    
+    vtLine=$(vtoytool vtoyksym blkdev_put /tmp/kallsyms)        
+    blkdev_put_addr=$(echo $vtLine | awk '{print $1}')
+    
     if grep -m1 -q 'close_table_device.isra' /tmp/kallsyms; then
         vtLine=$(vtoytool vtoyksym close_table_device.isra /tmp/kallsyms)
     else
@@ -184,6 +190,7 @@ ventoy_do_dm_patch() {
 
     ventoy_log get_addr=$get_addr  get_size=$get_size
     ventoy_log put_addr=$put_addr  put_size=$put_size
+    ventoy_log blkdev_get_addr=$blkdev_get_addr blkdev_put_addr=$blkdev_put_addr
     ventoy_log kprobe_reg_addr=$kprobe_reg_addr  kprobe_unreg_addr=$kprobe_unreg_addr
     ventoy_log ro_addr=$ro_addr  rw_addr=$rw_addr  printk_addr=$printk_addr
 
@@ -197,6 +204,8 @@ ventoy_do_dm_patch() {
     fi
 
     vtKv=$(uname -r)
+    vtKVMajor=$(echo $vtKv | awk -F. '{print $1}')
+    vtKVMinor=$(echo $vtKv | awk -F. '{print $2}')
     
     if [ ! -d /lib/modules/$vtKv ]; then
         ventoy_log "No modules directory found"
@@ -234,11 +243,11 @@ ventoy_do_dm_patch() {
 
     
     #step1: modify vermagic/mod crc/relocation
-    vtoytool vtoykmod -u /tmp/dm_patch.ko /tmp/$vtModName $vtDebug >>/tmp/vtoy.log 2>&1
+    vtoytool vtoykmod -u $vtKVMajor $vtKVMinor /tmp/dm_patch.ko /tmp/$vtModName $vtDebug >>/tmp/vtoy.log 2>&1
     
     #step2: fill parameters
     vtPgsize=$(vtoytool vtoyksym -p)
-    vtoytool vtoykmod -f /tmp/dm_patch.ko $vtPgsize 0x$printk_addr 0x$ro_addr 0x$rw_addr $get_addr $get_size $put_addr $put_size 0x$kprobe_reg_addr 0x$kprobe_unreg_addr $vtKv $vtIBT $vtDebug >>/tmp/vtoy.log 2>&1
+    vtoytool vtoykmod -f /tmp/dm_patch.ko $vtPgsize 0x$printk_addr 0x$ro_addr 0x$rw_addr $get_addr $get_size $put_addr $put_size 0x$kprobe_reg_addr 0x$kprobe_unreg_addr $vtKVMajor $vtIBT $vtKVMinor $blkdev_get_addr $blkdev_put_addr $vtDebug >>/tmp/vtoy.log 2>&1
 
     ventoy_check_insmod
     insmod /tmp/dm_patch.ko >>/tmp/vtoy.log 2>&1
