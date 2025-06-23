@@ -37,7 +37,7 @@ jobs:
           git add README.md
 
           # Process each release from JSON
-          jq -c '.[]' < ../releases.json | while read release; do
+          while read release; do
             tag_name=$(jq -r '.tag_name' <<< "$release")
             iso_url=$(jq -r '.assets | select(contains("vtoyboot-") and endswith(".iso"))' <<< "$release")
 
@@ -67,7 +67,7 @@ jobs:
 
             # Tag release
             git tag -a "$tag_name" -m "vtoyboot $tag_name"
-          done
+          done < ../releases.json
 
       - name: Force push updates and tags
         run: |
