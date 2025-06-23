@@ -41,13 +41,11 @@ if ! grep -q '^HOOKS=.*ventoy' /etc/mkinitcpio.conf; then
     else
         exthook='lvm2 ventoy'
     fi
-
+    
     if grep -q '^HOOKS=.*encrypt' /etc/mkinitcpio.conf; then
         sed "s/\(^HOOKS=.*\)encrypt/\1 $exthook encrypt/" -i /etc/mkinitcpio.conf
-    elif grep -q "^HOOKS=\"" /etc/mkinitcpio.conf; then    
+    else
         sed "s/^HOOKS=\"\(.*\)\"/HOOKS=\"\1 $exthook\"/" -i /etc/mkinitcpio.conf
-    elif grep -q "^HOOKS=(" /etc/mkinitcpio.conf; then    
-        sed "s/^HOOKS=(\(.*\))/HOOKS=(\1 $exthook)/" -i /etc/mkinitcpio.conf
     fi
 fi
 
