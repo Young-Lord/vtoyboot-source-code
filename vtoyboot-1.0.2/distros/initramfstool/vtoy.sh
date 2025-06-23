@@ -17,36 +17,15 @@
 # 
 #************************************************************************************
 
-vtoy_clean_env() {
-    rm -f /sbin/vtoydump  /sbin/vtoypartx  /sbin/vtoydrivers
-    rm -f /usr/share/initramfs-tools/hooks/vtoy-hook.sh  
-    rm -f /etc/initramfs-tools/scripts/local-top/vtoy-local-top.sh
-}
-
-vtoy_fixup() {
-    #bootx64.efi missing after kali installed
-    if [ -f /boot/efi/EFI/kali/grubx64.efi ]; then
-        if ! [ -f /boot/efi/EFI/boot/bootx64.efi ]; then
-            mkdir -p /boot/efi/EFI/boot
-            cp -a /boot/efi/EFI/kali/grubx64.efi /boot/efi/EFI/boot/bootx64.efi
-        fi
-    fi
-}
-
-vtoy_clean_env
+rm -f /sbin/vtoydump  /sbin/vtoypartx  
+rm -f /usr/share/initramfs-tools/hooks/vtoy-hook.sh  
+rm -f /etc/initramfs-tools/scripts/local-top/vtoy-local-top.sh
 
 cp -a $vtdumpcmd /sbin/vtoydump
 cp -a $partxcmd  /sbin/vtoypartx
-cp -a ./tools/vtoydrivers /sbin/vtoydrivers
 cp -a ./distros/$initrdtool/vtoy-hook.sh  /usr/share/initramfs-tools/hooks/
 cp -a ./distros/$initrdtool/vtoy-local-top.sh  /etc/initramfs-tools/scripts/local-top/
 
 echo "updating the initramfs, please wait ..."
 update-initramfs -u
-
-#clean
-vtoy_clean_env
-
-#fixup 
-vtoy_fixup
 
