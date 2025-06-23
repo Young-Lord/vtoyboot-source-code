@@ -19,8 +19,18 @@
 
 vtoy_clean_env() {
     rm -f /sbin/vtoydump  /sbin/vtoypartx  /sbin/vtoydrivers
-    rm -f /usr/lib/initcpio/hooks/ventoy
-    rm -f /usr/lib/initcpio/install/ventoy
+    rm -f /usr/share/initramfs-tools/hooks/vtoy-hook.sh  
+    rm -f /etc/initramfs-tools/scripts/local-top/vtoy-local-top.sh
+}
+
+vtoy_fixup() {
+    #bootx64.efi missing after kali installed
+    if [ -f /boot/efi/EFI/kali/grubx64.efi ]; then
+        if ! [ -f /boot/efi/EFI/boot/bootx64.efi ]; then
+            mkdir -p /boot/efi/EFI/boot
+            cp -a /boot/efi/EFI/kali/grubx64.efi /boot/efi/EFI/boot/bootx64.efi
+        fi
+    fi
 }
 
 vtoy_clean_env
@@ -28,18 +38,15 @@ vtoy_clean_env
 cp -a $vtdumpcmd /sbin/vtoydump
 cp -a $partxcmd  /sbin/vtoypartx
 cp -a ./tools/vtoydrivers /sbin/vtoydrivers
-cp -a ./distros/$initrdtool/ventoy-install.sh  /usr/lib/initcpio/install/ventoy
-cp -a ./distros/$initrdtool/ventoy-hook.sh  /usr/lib/initcpio/hooks/ventoy
+cp -a ./distros/$initrdtool/vtoy-hook.sh  /usr/share/initramfs-tools/hooks/
+cp -a ./distros/$initrdtool/vtoy-local-top.sh  /etc/initramfs-tools/scripts/local-top/
 
 echo "updating the initramfs, please wait ..."
+update-initramfs -u
 
-if ! grep -q '^HOOKS=.*ventoy' /etc/mkinitcpio.conf; then
-    if grep -q '^HOOKS=.*lvm' /etc/mkinitcpio.conf; then
-        exthook='ventoy'
-    else
-        exthook='lvm2 ventoy'
-    fi
-    sed "s/^HOOKS=\"\(.*\)\"/HOOKS=\"\1 $exthook\"/" -i /etc/mkinitcpio.conf
-fi
+#clean
+vtoy_clean_env
 
-mkinitcpio -P
+#fixup 
+vtoy_fixup
+

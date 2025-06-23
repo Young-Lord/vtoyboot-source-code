@@ -17,34 +17,33 @@
 # 
 #************************************************************************************
 
-vtoy_clean_env() {
-    rm -f /sbin/vtoydump  /sbin/vtoypartx  /sbin/vtoydrivers
-    rm -f /usr/share/initramfs-tools/hooks/vtoy-hook.sh  
-    rm -f /etc/initramfs-tools/scripts/local-top/vtoy-local-top.sh
-}
+if [ -e /lib/dracut/dracut-install ]; then
+    vtmodpath=/lib/dracut/modules.d/99ventoy
+else
+    vtmodpath=/usr/lib/dracut/modules.d/99ventoy
+fi
 
-vtoy_fixup() {
-    #bootx64.efi missing after kali installed
-    if [ -f /boot/efi/EFI/kali/grubx64.efi ]; then
-        if ! [ -f /boot/efi/EFI/boot/bootx64.efi ]; then
-            mkdir -p /boot/efi/EFI/boot
-            cp -a /boot/efi/EFI/kali/grubx64.efi /boot/efi/EFI/boot/bootx64.efi
+rm -f /bin/vtoydump /bin/vtoypartx
+rm -rf $vtmodpath
+mkdir -p $vtmodpath
+
+cp -a $vtdumpcmd /bin/vtoydump
+cp -a $partxcmd /bin/vtoypartx
+cp -a ./distros/$initrdtool/module-setup.sh $vtmodpath/
+cp -a ./distros/$initrdtool/ventoy-settled.sh $vtmodpath/
+
+for md in $(cat ./tools/vtoydrivers); do
+    if [ -n "$md" ]; then
+        if modinfo -n $md 2>/dev/null | grep -q '\.ko'; then
+            extdrivers="$extdrivers $md"
         fi
     fi
-}
-
-vtoy_clean_env
-
-cp -a $vtdumpcmd /sbin/vtoydump
-cp -a $partxcmd  /sbin/vtoypartx
-cp -a ./tools/vtoydrivers /sbin/vtoydrivers
-cp -a ./distros/$initrdtool/vtoy-hook.sh  /usr/share/initramfs-tools/hooks/
-cp -a ./distros/$initrdtool/vtoy-local-top.sh  /etc/initramfs-tools/scripts/local-top/
+done
 
 echo "updating the initramfs, please wait ..."
-update-initramfs -u
+dracut -f --force-drivers "$extdrivers" --add "ventoy"
 
-
-#fixup 
-vtoy_fixup
+#clean
+rm -f /bin/vtoydump /bin/vtoypartx
+rm -rf $vtmodpath
 
