@@ -76,6 +76,10 @@ jobs:
 
             # Tag release
             git tag -f -a "$tag_name" -m "vtoyboot $tag_name"
+
+            # Release
+            wget -q "$iso_url"
+            gh release create "$tag_name" -t "$tag_name" vtoyboot*.*
           done
 
       - name: Force push updates and tags
