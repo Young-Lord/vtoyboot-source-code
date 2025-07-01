@@ -43,10 +43,10 @@ jobs:
               continue
             fi
 
-            # if git rev-parse "refs/tags/$tag_name" &>/dev/null; then
-            #   echo "✅ $tag_name already processed"
-            #   continue
-            # fi
+            if git rev-parse "refs/tags/$tag_name" &>/dev/null; then
+              echo "✅ $tag_name already processed"
+              continue
+            fi
 
             echo "🚀 Processing $tag_name: $iso_url"
 
